@@ -7,9 +7,11 @@ import json
 import re
 from pathlib import Path
 import os
+from sqlmodel import Session, delete, SQLModel
 
 from constants import MWIS_URL
-from mwis_api.database import DB_CON
+from mwis_api.models import Forecast
+from mwis_api.database import engine
 
 
 @dataclass
@@ -18,7 +20,7 @@ class Region:
     region: str
 
 
-def get_regions(path: str) -> list[Region]:
+def get_regions(path: str | Path) -> list[Region]:
     df = pd.read_csv(path)
     return [Region(row.country, row.region) for row in df.itertuples()]
 
@@ -78,7 +80,7 @@ def scrape_region(country: str, region: str) -> dict[str, dict]:
     return forecast
 
 
-def scrape_mwis(regions_file: str) -> dict:
+def scrape_mwis(regions_file: str | Path) -> dict:
     regions: list[Region] = get_regions(regions_file)
 
     forecasts = {
@@ -97,16 +99,15 @@ def main():
     mwis_forecasts = scrape_mwis(regions_path)
     print(mwis_forecasts)
 
-    json_string = json.dumps(mwis_forecasts)
+    SQLModel.metadata.create_all(engine)
 
-    DB_CON.execute(
-        f"""
-        DROP TABLE forecasts;
-        
-        CREATE TABLE forecasts (j JSON);
-            INSERT INTO forecasts VALUES ({json_string})
-        """
-    )
+    with Session(engine) as session:
+        session.exec(delete(Forecast))
+
+        for region, data in mwis_forecasts.items():
+            session.add(Forecast(region=region, data=data))
+
+        session.commit()
 
 
 if __name__ == "__main__":

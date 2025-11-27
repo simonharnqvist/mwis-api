@@ -5,9 +5,11 @@ Unofficial and unsanctioned REST API for the Mountain Weather Information Servic
 In scope/requirements:
 * Web scraper for WMIS
 * API
+* Alembic schema management
 * Monitoring/observability
 * CI/CD
 * Docker image
+* AWS ECS/Fargate deployment
 
 Not in scope:
 * GUI (MWIS provides this)

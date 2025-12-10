@@ -13,6 +13,8 @@ from constants import MWIS_URL
 from mwis_api.models import Forecast
 from mwis_api.database import engine
 
+from sqlmodel import inspect, select
+
 
 @dataclass
 class Region:
@@ -97,9 +99,11 @@ def main():
     regions_path = Path(script_path).parent.joinpath("regions.csv")
 
     mwis_forecasts = scrape_mwis(regions_path)
-    print(mwis_forecasts)
+    # print(mwis_forecasts)
 
     SQLModel.metadata.create_all(engine)
+    inspector = inspect(engine)
+    print(inspector.get_table_names())
 
     with Session(engine) as session:
         session.exec(delete(Forecast))

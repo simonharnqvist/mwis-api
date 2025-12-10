@@ -1,29 +1,24 @@
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
+from sqlmodel import SQLModel, Session, create_engine
 from contextlib import contextmanager
+import os
 
-engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(bind=engine)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./mwis.db")
+
+engine = create_engine(DATABASE_URL, echo=True)
 
 
+# FastAPI dependency
 def get_db_session():
-    """FastAPI dependency function"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    with Session(engine) as session:
+        yield session
 
 
+def init_db():
+    SQLModel.metadata.create_all(engine)
+
+
+# for scripts
 @contextmanager
 def db_session():
-    """For scraping script"""
-    gen = get_db_session()
-    session = next(gen)
-    try:
+    with Session(engine) as session:
         yield session
-    finally:
-        try:
-            next(gen)
-        except StopIteration:
-            pass

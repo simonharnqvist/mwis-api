@@ -7,9 +7,10 @@ In scope/requirements:
 * API
 * Alembic schema management
 * Monitoring/observability
-* CI/CD
+* CI/CD for GitHub image respository + automatic deployment on ECS Fargate
 * Docker image
 * AWS ECS/Fargate deployment
+* Terraform IaC
 
 Not in scope:
 * GUI (MWIS provides this)

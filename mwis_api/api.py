@@ -1,23 +1,29 @@
 from fastapi import FastAPI, Query, Depends
 from fastapi.exceptions import HTTPException
-from typing import Optional
+from typing import Optional, List
 from sqlmodel import select, Session
-from sqlalchemy import and_
 
-from database import get_db_session
-from mwis_api.models import Forecast
-
-app = FastAPI()
+from mwis_api.database import get_db_session, init_db
+from mwis_api.models import Forecast, ForecastRead
 
 
-@app.get("/forecasts")
-def retrieve_all_forecasts(session: Session = Depends(get_db)):
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+@app.get("/forecasts", response_model=List[ForecastRead])
+def retrieve_all_forecasts(session: Session = Depends(get_db_session)):
+
     forecasts = session.exec(select(Forecast)).all()
-    return {f.region: f.data for f in forecasts}
+    return forecasts
 
 
 @app.get("/forecasts/{region_name}")
-def retrieve_forecast(
+def retrieve_region_forecast(
     region_name: str,
     date: Optional[str] = Query(None, description="Filter by date"),
     session: Session = Depends(get_db_session),

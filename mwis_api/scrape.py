@@ -9,7 +9,7 @@ from pathlib import Path
 import os
 from sqlmodel import Session, delete, SQLModel
 
-from constants import MWIS_URL
+from mwis_api.constants import MWIS_URL
 from mwis_api.models import Forecast
 from mwis_api.database import engine
 

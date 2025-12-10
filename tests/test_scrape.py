@@ -1,4 +1,4 @@
-from mwis_api.mwis_scraper.scrape import (
+from mwis_api.scrape import (
     Region,
     get_regions,
     get_forecast_html,
@@ -6,6 +6,8 @@ from mwis_api.mwis_scraper.scrape import (
     clean_string,
 )
 from datetime import date, timedelta
+import pytest
+from datetime import datetime
 
 
 @pytest.fixture
@@ -14,7 +16,7 @@ def soup():
 
 
 def test_get_regions():
-    assert get_regions("regions.csv") == [
+    assert get_regions("mwis_api/regions.csv") == [
         Region(country="scottish", region="the-northwest-highlands"),
         Region(country="scottish", region="west-highlands"),
         Region(country="scottish", region="cairngorms-np-and-monadhliath"),
@@ -36,7 +38,9 @@ def test_get_forecast_html(soup):
 
 def test_get_forecast_date(soup):
     # first date should be either today or tomorrow
-    forecast_date = get_forecast_date(soup, forecast_day="Forecast0")
+    forecast_date = datetime.strptime(
+        get_forecast_date(soup, forecast_day="Forecast0"), "%Y-%m-%d"
+    ).date()
     today = date.today()
     tomorrow = date.today() + timedelta(days=1)
     assert forecast_date == today or forecast_date == tomorrow

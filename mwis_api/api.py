@@ -42,7 +42,7 @@ def retrieve_region_forecast(
         stmt = select(Forecast.data[date].label("day_data")).where(
             Forecast.region == region_name
         )
-        day_data = session.exec(stmt).scalar()
+        day_data = session.exec(stmt).first()
 
         if day_data is None:
             raise HTTPException(

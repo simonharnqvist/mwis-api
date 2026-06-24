@@ -4,9 +4,32 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mwis_api"
-version = "0.0.1"
+version = "0.1.1"
+dependencies = ["fastapi",
+    "uvicorn",
+    "requests",
+    "beautifulsoup4",
+    "pika",
+    "ipykernel", # temp
+    "jsonschema",
+    "pytest",
+    "httpx2",
+]
+
 
 [tool.setuptools.packages.find]
 where = ["."]
 
+[tool.hatch.build.targets.wheel]
+packages = [
+    "api-service",
+    "mwis-common",
+    "scraping-service",
+]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["api-service", "mwis-common", "scraping-service"]
+omit = ["tests/*"]

@@ -2,9 +2,7 @@ from fastapi import FastAPI, Query, Depends
 from fastapi.exceptions import HTTPException
 from typing import Optional, List
 from sqlmodel import select, Session
-
-from mwis_api.database import get_db_session, init_db
-from mwis_api.models import Forecast, ForecastRead
+from mwis_api.mwis_common.models import Forecast, ForecastRead
 
 
 async def lifespan(app: FastAPI):

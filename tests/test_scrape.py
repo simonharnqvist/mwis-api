@@ -1,13 +1,15 @@
-from mwis_api.scrape import (
+from mwis_api.scraping_service.scrape import (
     Region,
     get_regions,
     get_forecast_html,
     get_forecast_date,
+    get_region_forecast,
     clean_string,
 )
 from datetime import date, timedelta
 import pytest
 from datetime import datetime
+import jsonschema
 
 
 @pytest.fixture
@@ -32,18 +34,40 @@ def test_get_regions():
     ]
 
 
-def test_get_forecast_html(soup):
-    assert soup.find("title").text == "Southern Uplands Forecast"
+def test_get_forecast_title(soup):
+    assert soup.find("title").text == "Cairngorms NP and Monadhliath Forecast"
 
 
 def test_get_forecast_date(soup):
-    # first date should be either today or tomorrow
-    forecast_date = datetime.strptime(
-        get_forecast_date(soup, forecast_day="Forecast0"), "%Y-%m-%d"
-    ).date()
-    today = date.today()
-    tomorrow = date.today() + timedelta(days=1)
-    assert forecast_date == today or forecast_date == tomorrow
+    assert get_forecast_date(soup, forecast_day="Forecast0") == "2026-06-24"
+
+
+def test_forecast_schema(soup):
+
+    forecast = get_region_forecast(soup)
+
+    FORECAST_SCHEMA = {
+        "type": "object",
+        "required": ["2026-06-24", "2026-06-25", "2026-06-26"],
+        "additionalProperties": {
+            "type": "object",
+            "required": [
+                "How windy? (On the Munros)",
+                "Effect of the wind on you?",
+                "How Wet?",
+                "Cloud on the hills?",
+                "Chance of cloud free Munros?",
+                "Sunshine and air clarity?",
+                "How Cold? (at 900m)",
+                "Freezing Level",
+                "Last Updated",
+                "Forecast Area",
+            ],
+            "additionalProperties": True,
+        },
+    }
+
+    jsonschema.validate(forecast, FORECAST_SCHEMA)
 
 
 def test_clean_string():

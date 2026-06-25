@@ -17,6 +17,8 @@ dependencies = ["fastapi",
     "pandas",
     "tenacity",
     "testcontainers[rabbitmq]",
+    "sqlalchemy",
+    "psycopg2-binary"
 ]
 
 [tool.setuptools]

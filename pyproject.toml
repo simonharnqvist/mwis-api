@@ -14,22 +14,19 @@ dependencies = ["fastapi",
     "jsonschema",
     "pytest",
     "httpx2",
+    "pandas",
+    "tenacity",
+    "testcontainers[rabbitmq]",
 ]
 
+[tool.setuptools]
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
-where = ["."]
-
-[tool.hatch.build.targets.wheel]
-packages = [
-    "api-service",
-    "mwis-common",
-    "scraping-service",
-]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["api-service", "mwis-common", "scraping-service"]
-omit = ["tests/*"]
+source = ["mwis_api"]

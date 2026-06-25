@@ -1,37 +1,22 @@
-from mwis_api.scraping_service.scrape import (
-    Region,
-    get_regions,
-    get_forecast_html,
+from mwis_api.scraper.scrape import (
     get_forecast_date,
     get_region_forecast,
     clean_string,
+    scrape_mwis,
 )
-from datetime import date, timedelta
+from mwis_api.common.models import Region
 import pytest
-from datetime import datetime
 import jsonschema
+from bs4 import BeautifulSoup
 
 
 @pytest.fixture
 def soup():
-    return get_forecast_html("scottish", "southern-uplands")
+    with open("tests/html_fixtures/Cairngorms NP and Monadhliath Forecast.html") as f:
+        html = f.read()
 
-
-def test_get_regions():
-    assert get_regions("mwis_api/regions.csv") == [
-        Region(country="scottish", region="the-northwest-highlands"),
-        Region(country="scottish", region="west-highlands"),
-        Region(country="scottish", region="cairngorms-np-and-monadhliath"),
-        Region(country="scottish", region="southeastern-highlands"),
-        Region(country="scottish", region="southern-uplands"),
-        Region(country="english-and-welsh", region="lake-district"),
-        Region(
-            country="english-and-welsh", region="yorkshire-dales-and-north-pennines"
-        ),
-        Region(country="english-and-welsh", region="peak-district"),
-        Region(country="english-and-welsh", region="snowdonia-national-park"),
-        Region(country="english-and-welsh", region="brecon-beacons"),
-    ]
+    soup = BeautifulSoup(html, features="html.parser")
+    return soup
 
 
 def test_get_forecast_title(soup):

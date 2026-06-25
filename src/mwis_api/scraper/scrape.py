@@ -9,7 +9,8 @@ from bs4 import BeautifulSoup
 
 from .config import MWIS_URL
 from .publisher import RabbitMQPublisher
-from mwis_api.mwis_common.models import Region, ForecastMessage
+from mwis_api.common.models import Region, ForecastMessage
+from mwis_api.scraper.regions import mwis_regions
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +88,10 @@ def scrape_region(country: str, region: str) -> dict[str, dict]:
     return forecast
 
 
-def scrape_mwis(regions_file: str | Path) -> list[ForecastMessage]:
+def scrape_mwis(regions: list[Region]) -> list[ForecastMessage]:
     messages: list[ForecastMessage] = []
 
-    for region in get_regions(regions_file):
+    for region in regions:
         logger.info("Scraping %s", region.region)
 
         messages.append(
@@ -109,22 +110,26 @@ def scrape_mwis(regions_file: str | Path) -> list[ForecastMessage]:
     return messages
 
 
+def publish_forecasts(
+    forecasts: list[ForecastMessage], publisher: RabbitMQPublisher
+) -> None:
+    for forecast in forecasts:
+        publisher.publish(forecast)
+        logger.info("Published forecast for %s", forecast.region)
+
+
 def main():
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
     )
 
-    regions_path = Path(__file__).resolve().parent / "regions.csv"
-
-    forecasts = scrape_mwis(regions_path)
+    forecasts = scrape_mwis(regions=mwis_regions)
 
     publisher = RabbitMQPublisher()
 
     try:
-        for forecast in forecasts:
-            publisher.publish(forecast)
-            logger.info("Published forecast for %s", forecast.region)
+        publish_forecasts(forecasts=forecasts, publisher=publisher)
     finally:
         publisher.close()
 

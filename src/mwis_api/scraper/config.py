@@ -6,4 +6,4 @@ RABBITMQ_QUEUE = os.getenv(
     "forecast_updates",
 )
 
-MWIS_URL = 
+MWIS_URL = "https://www.mwis.org.uk/"

@@ -2,18 +2,32 @@ from fastapi import FastAPI, Query, Depends
 from fastapi.exceptions import HTTPException
 from typing import Optional, List
 from sqlmodel import select, Session
-from mwis_api.mwis_common.models import Forecast, ForecastRead
+from datetime import date
+from mwis_api.api.response_models import ForecastResponse
+from mwis_api.db.models import Forecast
+from mwis_api.db.db import Database, get_db_url
+from contextlib import asynccontextmanager
+
+db: Database | None = None
 
 
+@asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    global db
+    db = Database(get_db_url())
+    db.create_tables()
     yield
 
 
 app = FastAPI(lifespan=lifespan)
 
 
-@app.get("/forecasts", response_model=List[ForecastRead])
+def get_db_session():
+    with Session(db.engine) as session:
+        yield session
+
+
+@app.get("/forecasts", response_model=List[ForecastResponse])
 def retrieve_all_forecasts(session: Session = Depends(get_db_session)):
 
     forecasts = session.exec(select(Forecast)).all()
@@ -23,29 +37,19 @@ def retrieve_all_forecasts(session: Session = Depends(get_db_session)):
 @app.get("/forecasts/{region_name}")
 def retrieve_region_forecast(
     region_name: str,
-    date: Optional[str] = Query(None, description="Filter by date"),
+    forecast_date: date | None = Query(None),
     session: Session = Depends(get_db_session),
 ):
-    if date is None:
-        stmt = select(Forecast).where(Forecast.region == region_name)
-        forecast = session.exec(stmt).first()
+    stmt = select(Forecast).where(Forecast.region == region_name)
 
-        if not forecast:
-            raise HTTPException(
-                status_code=404, detail=f"Region '{region_name}' not found"
-            )
-
-        return forecast.data if forecast else {}
+    if forecast_date is None:
+        stmt = stmt.order_by(Forecast.forecast_date.desc())
     else:
-        stmt = select(Forecast.data[date].label("day_data")).where(
-            Forecast.region == region_name
-        )
-        day_data = session.exec(stmt).first()
+        stmt = stmt.where(Forecast.forecast_date == forecast_date)
 
-        if day_data is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Data for date {date} not found for region '{region_name}'",
-            )
+    forecast = session.exec(stmt).first()
 
-        return {date: day_data} if day_data else {}
+    if forecast is None:
+        raise HTTPException(status_code=404, detail="Forecast not found")
+
+    return forecast.forecast

@@ -5,7 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mwis_api"
 version = "0.1.1"
-dependencies = ["fastapi",
+dependencies = [
+    "fastapi",
     "uvicorn",
     "requests",
     "beautifulsoup4",
@@ -18,7 +19,8 @@ dependencies = ["fastapi",
     "tenacity",
     "testcontainers[rabbitmq]",
     "sqlalchemy",
-    "psycopg2-binary"
+    "psycopg2-binary",
+    "sqlmodel",
 ]
 
 [tool.setuptools]

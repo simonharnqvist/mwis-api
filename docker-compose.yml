@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: mwis-postgres
+    environment:
+      POSTGRES_DB: mwis
+      POSTGRES_USER: mwis_user
+      POSTGRES_PASSWORD: mwis_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mwis_user -d mwis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mwis-network
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mwis-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://mwis_user:mwis_password@postgres:5432/mwis
+      - LOG_LEVEL=info
+    volumes:
+      - ./mwis_api:/app/mwis_api
+    command: uvicorn mwis_api.api:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/forecasts"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - mwis-network
+
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mwis-scraper
+    environment:
+      - DATABASE_URL=postgresql://mwis_user:mwis_password@postgres:5432/mwis
+    volumes:
+      - ./mwis_api:/app/mwis_api
+    command: sh -c "python -m mwis_api.scrape && while true; do sleep 3600 && python -m mwis_api.scrape; done"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mwis-network
+
+volumes:
+  postgres_data:
+
+networks:
+  mwis-network:
+    driver: bridge

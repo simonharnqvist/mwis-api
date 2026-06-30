@@ -1,19 +1,23 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
     container_name: mwis-postgres
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: mwis
-      POSTGRES_USER: mwis_user
-      POSTGRES_PASSWORD: mwis_password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mwis_user -d mwis"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,24 +30,29 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mwis-api
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://mwis_user:mwis_password@postgres:5432/mwis
-      - LOG_LEVEL=info
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LOG_LEVEL: info
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
     volumes:
       - ./mwis_api:/app/mwis_api
-    command: uvicorn mwis_api.api:app --host 0.0.0.0 --port 8000 --reload
-    restart: unless-stopped
+    command: uvicorn mwis_api.api.api:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/forecasts"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
     networks:
       - mwis-network
 
@@ -52,15 +61,40 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mwis-scraper
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://mwis_user:mwis_password@postgres:5432/mwis
-    volumes:
-      - ./mwis_api:/app/mwis_api
-    command: sh -c "python -m mwis_api.scrape && while true; do sleep 3600 && python -m mwis_api.scrape; done"
-    restart: unless-stopped
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+    command: >
+      sh -c "
+        python -m mwis_api.scraper.scrape &&
+        while true; do
+          sleep 3600
+          python -m mwis_api.scraper.scrape
+        done
+      "
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - mwis-network
+
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: mwis-rabbitmq
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: unless-stopped
     networks:
       - mwis-network
 

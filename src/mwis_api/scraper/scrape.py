@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from .config import MWIS_URL
+from .config import MWIS_URL, RABBITMQ_PARAMS
 from .publisher import RabbitMQPublisher
 from mwis_api.common.models import Region, ForecastMessage
 from mwis_api.scraper.regions import mwis_regions
@@ -26,7 +26,8 @@ def get_forecast_html(country: str, region: str) -> BeautifulSoup:
     if country not in ("scottish", "english-and-welsh"):
         raise ValueError("country must be either 'scottish' or 'english-and-welsh'")
 
-    url = f"{MWIS_URL}/{country}/{region}"
+    url = f"{MWIS_URL}/{country}/{region}/text"
+    logger.info(msg=f"URL: {url}")
 
     response = requests.get(url, timeout=30)
     response.raise_for_status()
@@ -53,6 +54,11 @@ def clean_string(s: str) -> str:
 def get_region_forecast(soup: BeautifulSoup) -> dict[str, dict]:
 
     forecast: dict[str, dict] = {}
+
+    try:
+        soup.find("div", id="Forecast0")
+    except Exception as e:
+        print(e, soup)
 
     last_updated = clean_string(
         soup.find("div", id="Forecast0").find("small").text
@@ -92,7 +98,10 @@ def scrape_mwis(regions: list[Region]) -> list[ForecastMessage]:
     messages: list[ForecastMessage] = []
 
     for region in regions:
-        logger.info("Scraping %s", region.region)
+        logger.info("Scraping %s in %s", region.region, region.country)
+        # logger.info(get_forecast_html(region.country, region.region))
+        # soup = get_forecast_html(region.country, region.region)
+        # logger.info(get_region_forecast(soup))
 
         messages.append(
             ForecastMessage(
@@ -126,7 +135,7 @@ def main():
 
     forecasts = scrape_mwis(regions=mwis_regions)
 
-    publisher = RabbitMQPublisher()
+    publisher = RabbitMQPublisher(connection_params=RABBITMQ_PARAMS)
 
     try:
         publish_forecasts(forecasts=forecasts, publisher=publisher)

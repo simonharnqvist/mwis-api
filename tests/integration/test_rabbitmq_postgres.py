@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, text
 from testcontainers.rabbitmq import RabbitMqContainer
 from testcontainers.postgres import PostgresContainer
 
-from mwis_api.db.worker import ForecastWorker
+from mwis_api.worker.worker import ForecastWorker
 
 
 @pytest.fixture(scope="session")

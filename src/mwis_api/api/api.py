@@ -2,29 +2,29 @@ from fastapi import FastAPI, Query, Depends
 from fastapi.exceptions import HTTPException
 from typing import Optional, List
 from sqlmodel import select, Session
+from sqlalchemy import create_engine
 from datetime import date
-from mwis_api.api.response_models import ForecastResponse
-from mwis_api.db.models import Forecast
-from mwis_api.db.db import Database, get_db_url
 from contextlib import asynccontextmanager
+from mwis_api.api.response_models import ForecastResponse
+from mwis_api.common.models import Forecast
+import os
 
-db: Database | None = None
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DB URL not provided")
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global db
-    db = Database(get_db_url())
-    db.create_tables()
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 
 def get_db_session():
-    with Session(db.engine) as session:
-        yield session
+    try:
+        engine = create_engine(DATABASE_URL)
+        with Session(engine) as session:
+            yield session
+    except Exception as e:
+        raise ConnectionError(
+            f"DB connection to {DATABASE_URL} refused or failed. Error : {e}"
+        )
 
 
 @app.get("/forecasts", response_model=List[ForecastResponse])

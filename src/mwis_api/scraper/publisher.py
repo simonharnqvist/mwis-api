@@ -30,17 +30,30 @@ class RabbitMQPublisher:
         reraise=True,
     )
     def _connect(self):
-        self._connection = pika.BlockingConnection(self._connection_params)
-        self._channel = self._connection.channel()
 
-        self._channel.queue_declare(
-            queue=self._queue,
-            durable=True,
+        logger.info(
+            "RabbitMQ host=%s port=%s",
+            self._connection_params.host,
+            self._connection_params.port,
         )
 
-        self._channel.confirm_delivery()
+        try:
+            self._connection = pika.BlockingConnection(self._connection_params)
+            self._channel = self._connection.channel()
 
-        logger.info("Connected to RabbitMQ")
+            self._channel.queue_declare(
+                queue=self._queue,
+                durable=True,
+            )
+
+            self._channel.confirm_delivery()
+
+            logger.info("Connected to RabbitMQ")
+
+        except Exception as e:
+            raise RuntimeError(
+                f"❌ Failed to connect to RabbitMQ service at {self._connection_params}. Error: {e}"
+            )
 
     def _ensure_connected(self):
         if (

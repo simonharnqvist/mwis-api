@@ -1,4 +1,68 @@
 services:
+
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mwis-scraper
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+    command: >
+      sh -c "
+        python -m mwis_api.scraper.scrape &&
+        while true; do
+          sleep 3600
+          python -m mwis_api.scraper.scrape
+        done
+      "
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - mwis-network
+
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: mwis-rabbitmq
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mwis-network
+
+  worker:
+    build:
+      context: .
+    container_name: mwis-worker
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+    command: python -m mwis_api.worker.worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - mwis-network
+
   postgres:
     image: postgres:15-alpine
     container_name: mwis-postgres
@@ -25,6 +89,23 @@ services:
       - mwis-network
     restart: unless-stopped
 
+
+  migrate:
+    container_name: mwis-migrate
+    build:
+      context: .
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    command: alembic upgrade head
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - mwis-network
+
   api:
     build:
       context: .
@@ -35,17 +116,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       LOG_LEVEL: info
-      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
     volumes:
       - ./mwis_api:/app/mwis_api
-    command: uvicorn mwis_api.api.api:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn mwis_api.api.api:app --host 0.0.0.0 --port 8000
     depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_started
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/forecasts"]
       interval: 30s
@@ -56,47 +135,6 @@ services:
     networks:
       - mwis-network
 
-  scraper:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: mwis-scraper
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
-    command: >
-      sh -c "
-        python -m mwis_api.scraper.scrape &&
-        while true; do
-          sleep 3600
-          python -m mwis_api.scraper.scrape
-        done
-      "
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_started
-    restart: unless-stopped
-    networks:
-      - mwis-network
-
-  rabbitmq:
-    image: rabbitmq:management
-    container_name: mwis-rabbitmq
-    env_file:
-      - .env
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    restart: unless-stopped
-    networks:
-      - mwis-network
 
 volumes:
   postgres_data:

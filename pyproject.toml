@@ -21,6 +21,7 @@ dependencies = [
     "sqlalchemy",
     "psycopg2-binary",
     "sqlmodel",
+    "alembic"
 ]
 
 [tool.setuptools]

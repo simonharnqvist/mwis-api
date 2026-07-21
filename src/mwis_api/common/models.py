@@ -11,6 +11,7 @@ class ForecastMessage:
     region: str
     country: str
     scraped_at: str
+    forecast_date: str
     forecast: dict[str, dict]
 
 

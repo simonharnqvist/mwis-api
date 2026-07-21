@@ -9,47 +9,33 @@ from mwis_api.api.response_models import ForecastResponse
 from mwis_api.common.models import Forecast
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise ValueError("DB URL not provided")
+from mwis_api.repository.forecast import ForecastRepository
+from mwis_api.api.response_models import ForecastResponse
 
 app = FastAPI()
 
 
-def get_db_session():
-    try:
-        engine = create_engine(DATABASE_URL)
-        with Session(engine) as session:
-            yield session
-    except Exception as e:
-        raise ConnectionError(
-            f"DB connection to {DATABASE_URL} refused or failed. Error : {e}"
-        )
+def get_forecast_repository():
+    return ForecastRepository()
 
 
 @app.get("/forecasts", response_model=List[ForecastResponse])
-def retrieve_all_forecasts(session: Session = Depends(get_db_session)):
-
-    forecasts = session.exec(select(Forecast)).all()
-    return forecasts
+def retrieve_all_forecasts(repo: ForecastRepository = Depends(get_forecast_repository)):
+    return repo.get_all()
 
 
 @app.get("/forecasts/{region_name}")
 def retrieve_region_forecast(
     region_name: str,
     forecast_date: date | None = Query(None),
-    session: Session = Depends(get_db_session),
+    repo: ForecastRepository = Depends(get_forecast_repository),
 ):
-    stmt = select(Forecast).where(Forecast.region == region_name)
-
-    if forecast_date is None:
-        stmt = stmt.order_by(Forecast.forecast_date.desc())
-    else:
-        stmt = stmt.where(Forecast.forecast_date == forecast_date)
-
-    forecast = session.exec(stmt).first()
+    forecast = repo.get_region_forecast(region_name, forecast_date)
 
     if forecast is None:
-        raise HTTPException(status_code=404, detail="Forecast not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Forecast not found",
+        )
 
     return forecast.forecast

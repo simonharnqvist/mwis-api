@@ -5,9 +5,8 @@ from sqlmodel import Session
 
 from testcontainers.postgres import PostgresContainer
 
-from mwis_api.api.api import app, get_db_session
-from mwis_api.db.models import Forecast
-from mwis_api.db.db import Database
+from mwis_api.api.api import app, get_forecast_repository
+from mwis_api.common.models import ForecastMessage
 
 
 @pytest.fixture(scope="session")
@@ -17,38 +16,38 @@ def postgres():
 
 
 @pytest.fixture
-def client(postgres):
-    db = Database(postgres)
-    db.create_tables()
+def repository(postgres):
+    repo = ForecastRepository(postgres)
+    repo.create_tables()
+    return repo
 
-    def override_db():
-        with Session(db.engine) as session:
-            yield session
 
-    app.dependency_overrides[get_db_session] = override_db
+@pytest.fixture
+def client(repository):
+    def override_repository():
+        return repository
+
+    app.dependency_overrides[get_forecast_repository] = override_repository
 
     yield TestClient(app)
 
     app.dependency_overrides.clear()
 
 
-def test_get_forecast(client, postgres):
-    db = Database(postgres)
-
-    with Session(db.engine) as session:
-        session.add(
-            Forecast(
-                forecast_date="2026-06-25",
-                scraped_at="2026-06-25T12:00:00Z",
-                country="Scottish",
-                region="Cairngorms",
-                forecast={
-                    "Weather": "Sunny",
-                    "Wind": "Light",
-                },
-            )
+def test_get_forecast(client, repository):
+    repository.insert(
+        ForecastMessage(
+            version="1",
+            forecast_date="2026-06-25",
+            scraped_at="2026-06-25T12:00:00Z",
+            country="Scottish",
+            region="Cairngorms",
+            forecast={
+                "Weather": "Sunny",
+                "Wind": "Light",
+            },
         )
-        session.commit()
+    )
 
     response = client.get("/forecasts/Cairngorms")
 
